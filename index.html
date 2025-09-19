@@ -37,16 +37,15 @@
 <canvas id="myChart" width="900" height="400"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.0/dist/chartjs-adapter-luxon.min.js"></script>
 
 <script>
-const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdJEMFFaONhtyaDh6C1hn42VSftOUH8bUMQN3RD-L4WXu46mntzuqkGgqKWBK0BbiZ58kdTuSnTDac/pub?output=csv";
+// Google Sheets CSV link
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdJEMFFaONhtyaDh6C1hn42VSftOUH8bUMQN3RD-L4WXu46mntzuqkGgqKWBK0BbiZ58kdTuSnTDac/pub?output=csv"; 
 
 let allData = [];
 let chart;
 
-// Fetch CSV
+// Fetch CSV and parse
 fetch(csvUrl)
   .then(res => res.text())
   .then(text => {
@@ -58,15 +57,14 @@ fetch(csvUrl)
       air: parseFloat(r[4]),
       baro: parseFloat(r[5]),
       light: parseFloat(r[6]),
-      // Parse column K as text with AM/PM
-      datetime: luxon.DateTime.fromFormat(r[10], "MMM dd h:mm a").toJSDate()
+      datetime: r[10] // Use column K as text with AM/PM
     })).filter(d => !isNaN(d.water));
 
     drawChart('water', 12); // default
   })
   .catch(e => console.error("CSV fetch error", e));
 
-// Draw chart
+// Draw chart function
 function drawChart(measurement, num){
   const dataSubset = (num==='all') ? allData : allData.slice(-num);
   const labels = dataSubset.map(d => d.datetime);
@@ -97,26 +95,17 @@ function drawChart(measurement, num){
         callbacks:{
           label: function(ctx){
             let value = ctx.parsed.y;
-            const datetime = luxon.DateTime.fromJSDate(new Date(ctx.label)).toFormat("MMM dd h:mm a");
             if(ctx.dataset.label==='baro') value = value.toFixed(2) + ' inHg';
             else if(ctx.dataset.label==='light') value = value + ' %';
             else value = value + ' °F';
-            return `${value} at ${datetime}`;
+            return `${value} at ${ctx.label}`;
           }
         }
       }
     },
     scales:{
       x:{
-        type:'time',
-        time:{
-          unit: 'hour',
-          tooltipFormat: 'MMM dd h:mm a',
-          displayFormats:{
-            hour:'MMM dd h:mm a',
-            day:'MMM dd'
-          }
-        },
+        type:'category', // treat text labels as categories
         title:{
           display:true,
           text:'Date & Time',
