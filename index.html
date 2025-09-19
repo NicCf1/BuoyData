@@ -58,8 +58,8 @@ fetch(csvUrl)
       air: parseFloat(r[4]),
       baro: parseFloat(r[5]),
       light: parseFloat(r[6]),
-datetime: luxon.DateTime.fromFormat(r[10], "MMM dd h:mm a").toJSDate()
-
+      // Parse column K "Feb 16 7:45 AM" with Luxon
+      datetime: luxon.DateTime.fromFormat(r[10], "MMM dd h:mm a").toJSDate()
     })).filter(d => !isNaN(d.water));
 
     drawChart('water', 12); // default
@@ -69,14 +69,14 @@ datetime: luxon.DateTime.fromFormat(r[10], "MMM dd h:mm a").toJSDate()
 // Draw chart
 function drawChart(measurement, num){
   const dataSubset = (num==='all') ? allData : allData.slice(-num);
-  const labels = dataSubset.map(d => new Date(d.datetime));
+  const labels = dataSubset.map(d => d.datetime);
 
   const colorMap = {water:'blue', seabed:'purple', air:'red', baro:'green', light:'orange'};
   const minMaxMap = {
     water:[0,100],
     seabed:[0,100],
     air:[0,100],
-    baro:[28,31],
+    baro:[28,31], // inHg
     light:[0,100]
   };
 
@@ -97,7 +97,7 @@ function drawChart(measurement, num){
         callbacks:{
           label: function(ctx){
             let value = ctx.parsed.y;
-            const datetime = ctx.label;
+            const datetime = luxon.DateTime.fromJSDate(new Date(ctx.label)).toFormat("MMM dd h:mm a");
             if(ctx.dataset.label==='baro') value = value.toFixed(2) + ' inHg';
             else if(ctx.dataset.label==='light') value = value + ' %';
             else value = value + ' °F';
@@ -110,9 +110,8 @@ function drawChart(measurement, num){
       x:{
         type:'time',
         time:{
-          parser:'MMM dd h:mm a', // matches "Feb 16 7:45 AM"
-          tooltipFormat:'MMM dd h:mm a',
-          unit:'hour',
+          unit: 'hour',
+          tooltipFormat: 'MMM dd h:mm a',
           displayFormats:{
             hour:'MMM dd h:mm a',
             day:'MMM dd'
