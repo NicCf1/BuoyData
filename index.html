@@ -58,13 +58,13 @@ fetch(csvUrl)
       air: parseFloat(r[4]),
       baro: parseFloat(r[5]),
       light: parseFloat(r[6]),
-      // Parse column K "Feb 16 7:45 AM" with Luxon
+      // Parse column K as text with AM/PM
       datetime: luxon.DateTime.fromFormat(r[10], "MMM dd h:mm a").toJSDate()
     })).filter(d => !isNaN(d.water));
 
     drawChart('water', 12); // default
   })
-  .catch(e=>console.error("CSV fetch error", e));
+  .catch(e => console.error("CSV fetch error", e));
 
 // Draw chart
 function drawChart(measurement, num){
