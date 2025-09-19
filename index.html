@@ -36,16 +36,17 @@
 
 <canvas id="myChart" width="900" height="400"></canvas>
 
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.0/dist/chartjs-adapter-luxon.min.js"></script>
+
 <script>
-// CSV link
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdJEMFFaONhtyaDh6C1hn42VSftOUH8bUMQN3RD-L4WXu46mntzuqkGgqKWBK0BbiZ58kdTuSnTDac/pub?output=csv";
 
 let allData = [];
 let chart;
 
-// Fetch CSV and parse
+// Fetch CSV
 fetch(csvUrl)
   .then(res => res.text())
   .then(text => {
@@ -57,7 +58,7 @@ fetch(csvUrl)
       air: parseFloat(r[4]),
       baro: parseFloat(r[5]),
       light: parseFloat(r[6]),
-      datetime: `${r[0]} ${r[1]}`
+      datetime: r[10] // Use column K
     })).filter(d => !isNaN(d.water));
 
     drawChart('water', 12); // default
@@ -67,23 +68,20 @@ fetch(csvUrl)
 // Draw chart
 function drawChart(measurement, num){
   const dataSubset = (num==='all') ? allData : allData.slice(-num);
-  const labels = dataSubset.map(d=>d.datetime);
+  const labels = dataSubset.map(d => new Date(d.datetime));
 
   const colorMap = {water:'blue', seabed:'purple', air:'red', baro:'green', light:'orange'};
   const minMaxMap = {
     water:[0,100],
     seabed:[0,100],
     air:[0,100],
-    baro:[28,31], // realistic inHg
+    baro:[28,31],
     light:[0,100]
   };
 
   const datasets = [{
     label: measurement,
-    data: dataSubset.map(d=>{
-      if(measurement==='baro') return d.baro;
-      return d[measurement];
-    }),
+    data: dataSubset.map(d => d[measurement]),
     borderColor: colorMap[measurement],
     backgroundColor: colorMap[measurement],
     fill:false,
@@ -108,6 +106,28 @@ function drawChart(measurement, num){
       }
     },
     scales:{
+      x:{
+        type:'time',
+        time:{
+          parser:'MMM dd h:mm a', // matches "Feb 16 7:45 AM"
+          tooltipFormat:'MMM dd h:mm a',
+          unit:'hour',
+          displayFormats:{
+            hour:'MMM dd h:mm a',
+            day:'MMM dd'
+          }
+        },
+        title:{
+          display:true,
+          text:'Date & Time',
+          font:{size:14, weight:'bold'}
+        },
+        ticks:{
+          autoSkip:true,
+          maxRotation:45,
+          minRotation:30
+        }
+      },
       y:{
         type:'linear',
         min:minMaxMap[measurement][0],
@@ -128,7 +148,7 @@ function drawChart(measurement, num){
   chart = new Chart(ctx,{type:'line', data:{labels,datasets}, options});
 }
 
-// Dropdown handlers
+// Dropdown events
 document.getElementById('measurementSelect').addEventListener('change', e=>{
   const num = document.getElementById('numSelect').value;
   drawChart(e.target.value, num);
