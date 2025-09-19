@@ -58,7 +58,8 @@ fetch(csvUrl)
       air: parseFloat(r[4]),
       baro: parseFloat(r[5]),
       light: parseFloat(r[6]),
-      datetime: r[10] // Use column K
+datetime: luxon.DateTime.fromFormat(r[10], "MMM dd h:mm a").toJSDate()
+
     })).filter(d => !isNaN(d.water));
 
     drawChart('water', 12); // default
