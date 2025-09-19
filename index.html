@@ -36,14 +36,16 @@
 
 <canvas id="myChart" width="900" height="400"></canvas>
 
+<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Google Sheets CSV link
-const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdJEMFFaONhtyaDh6C1hn42VSftOUH8bUMQN3RD-L4WXu46mntzuqkGgqKWBK0BbiZ58kdTuSnTDac/pub?output=csv"; 
+// CSV link
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdJEMFFaONhtyaDh6C1hn42VSftOUH8bUMQN3RD-L4WXu46mntzuqkGgqKWBK0BbiZ58kdTuSnTDac/pub?output=csv";
 
 let allData = [];
 let chart;
 
+// Fetch CSV and parse
 fetch(csvUrl)
   .then(res => res.text())
   .then(text => {
@@ -55,24 +57,33 @@ fetch(csvUrl)
       air: parseFloat(r[4]),
       baro: parseFloat(r[5]),
       light: parseFloat(r[6]),
-      datetime: `${r[0]} ${r[1]}` // Column A (date) + Column B (time)
+      datetime: `${r[0]} ${r[1]}`
     })).filter(d => !isNaN(d.water));
-    
-    drawChart('water', 12); // default chart
-  })
-  .catch(e=>{
-    console.error("Could not fetch CSV", e);
-  });
 
+    drawChart('water', 12); // default
+  })
+  .catch(e=>console.error("CSV fetch error", e));
+
+// Draw chart
 function drawChart(measurement, num){
-  let dataSubset = (num==='all') ? allData : allData.slice(-num);
+  const dataSubset = (num==='all') ? allData : allData.slice(-num);
   const labels = dataSubset.map(d=>d.datetime);
+
   const colorMap = {water:'blue', seabed:'purple', air:'red', baro:'green', light:'orange'};
-  const minMaxMap = {water:[0,100], seabed:[0,100], air:[0,100], baro:[28,31], light:[0,100]};
+  const minMaxMap = {
+    water:[0,100],
+    seabed:[0,100],
+    air:[0,100],
+    baro:[28,31], // realistic inHg
+    light:[0,100]
+  };
 
   const datasets = [{
     label: measurement,
-    data: dataSubset.map(d => d[measurement]),
+    data: dataSubset.map(d=>{
+      if(measurement==='baro') return d.baro;
+      return d[measurement];
+    }),
     borderColor: colorMap[measurement],
     backgroundColor: colorMap[measurement],
     fill:false,
@@ -85,16 +96,12 @@ function drawChart(measurement, num){
       legend:{position:'top'},
       tooltip:{
         callbacks:{
-          label: function(context){
-            let value = context.parsed.y;
-            const datetime = context.label;
-            if(context.dataset.label==='baro'){
-              value = value.toFixed(2) + ' inHg';
-            } else if(context.dataset.label==='light'){
-              value = value + ' %';
-            } else {
-              value = value + ' °F';
-            }
+          label: function(ctx){
+            let value = ctx.parsed.y;
+            const datetime = ctx.label;
+            if(ctx.dataset.label==='baro') value = value.toFixed(2) + ' inHg';
+            else if(ctx.dataset.label==='light') value = value + ' %';
+            else value = value + ' °F';
             return `${value} at ${datetime}`;
           }
         }
@@ -108,9 +115,9 @@ function drawChart(measurement, num){
         title:{
           display:true,
           text: measurement==='water'||measurement==='seabed'||measurement==='air' ? 'Temperature (°F)' :
-                measurement==='baro' ? 'Barometric Pressure (inHg)' : 'Light %',
+               measurement==='baro' ? 'Barometric Pressure (inHg)' : 'Light %',
           color: colorMap[measurement],
-          font: {size:16, weight:'bold'}
+          font:{size:16, weight:'bold'}
         }
       }
     }
@@ -118,10 +125,10 @@ function drawChart(measurement, num){
 
   if(chart) chart.destroy();
   const ctx = document.getElementById('myChart').getContext('2d');
-  chart = new Chart(ctx,{type:'line',data:{labels, datasets}, options});
+  chart = new Chart(ctx,{type:'line', data:{labels,datasets}, options});
 }
 
-// Dropdown events
+// Dropdown handlers
 document.getElementById('measurementSelect').addEventListener('change', e=>{
   const num = document.getElementById('numSelect').value;
   drawChart(e.target.value, num);
