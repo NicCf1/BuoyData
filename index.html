@@ -1,69 +1,136 @@
-const datasets = [{
-  label: measurement,
-  data: dataSubset.map(d=>{
-    if(measurement==='baro'){
-      // Convert hPa to inHg (if your sheet is in hPa), or assume already in inHg
-      // Then map to 0-100 for display purposes
-      const inHg = d.baro; // if your sheet already uses inHg
-      const minInHg = 28;  // approximate min expected inHg
-      const maxInHg = 31;  // approximate max expected inHg
-      // Map to 0-100 scale
-      return ((inHg - minInHg)/(maxInHg - minInHg))*100;
-    } else {
-      return d[measurement];
-    }
-  }),
-  borderColor: colorMap[measurement],
-  backgroundColor: colorMap[measurement],
-  fill:false,
-  pointRadius:4
-}];
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Buoy Measurements Graph</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+  #controls { margin-bottom: 20px; }
+  select { padding: 5px; margin: 0 10px; font-size: 1em; }
+</style>
+</head>
+<body>
 
-const minMaxMap = {
-  water:[0,100],
-  seabed:[0,100],
-  air:[0,100],
-  baro:[0,100],  // now baro is mapped to 0-100
-  light:[0,100]
-};
+<h2>Buoy Measurements</h2>
 
-const options = {
-  responsive:true,
-  plugins:{
-    legend:{position:'top'},
-    tooltip:{
-      callbacks:{
-        label: function(context){
-          let value = context.parsed.y;
-          const datetime = context.label;
-          if(context.dataset.label==='baro'){
-            // Convert back to inHg for tooltip
-            const minInHg = 28;
-            const maxInHg = 31;
-            value = (value/100)*(maxInHg - minInHg) + minInHg;
-            value = value.toFixed(2) + ' inHg';
-          } else if(context.dataset.label==='light'){
-            value = value + ' %';
-          } else {
-            value = value + ' °F';
+<div id="controls">
+  <label>Measurement: 
+    <select id="measurementSelect">
+      <option value="water" selected>Water Temp (°F)</option>
+      <option value="seabed">Seabed Temp (°F)</option>
+      <option value="air">Air Temp (°F)</option>
+      <option value="baro">Barometric (inHg)</option>
+      <option value="light">Light %</option>
+    </select>
+  </label>
+
+  <label>Number of readings: 
+    <select id="numSelect">
+      <option value="12">Last 12</option>
+      <option value="24">Last 24</option>
+      <option value="50">Last 50</option>
+      <option value="all">All</option>
+    </select>
+  </label>
+</div>
+
+<canvas id="myChart" width="900" height="400"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Google Sheets CSV link
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdJEMFFaONhtyaDh6C1hn42VSftOUH8bUMQN3RD-L4WXu46mntzuqkGgqKWBK0BbiZ58kdTuSnTDac/pub?output=csv"; 
+
+let allData = [];
+let chart;
+
+fetch(csvUrl)
+  .then(res => res.text())
+  .then(text => {
+    const rows = text.trim().split("\n").map(r => r.split(","));
+    const dataRows = rows.slice(1); // skip header
+    allData = dataRows.map(r => ({
+      water: parseFloat(r[2]),
+      seabed: parseFloat(r[3]),
+      air: parseFloat(r[4]),
+      baro: parseFloat(r[5]),
+      light: parseFloat(r[6]),
+      datetime: `${r[0]} ${r[1]}` // Column A (date) + Column B (time)
+    })).filter(d => !isNaN(d.water));
+    
+    drawChart('water', 12); // default chart
+  })
+  .catch(e=>{
+    console.error("Could not fetch CSV", e);
+  });
+
+function drawChart(measurement, num){
+  let dataSubset = (num==='all') ? allData : allData.slice(-num);
+  const labels = dataSubset.map(d=>d.datetime);
+  const colorMap = {water:'blue', seabed:'purple', air:'red', baro:'green', light:'orange'};
+  const minMaxMap = {water:[0,100], seabed:[0,100], air:[0,100], baro:[28,31], light:[0,100]};
+
+  const datasets = [{
+    label: measurement,
+    data: dataSubset.map(d => d[measurement]),
+    borderColor: colorMap[measurement],
+    backgroundColor: colorMap[measurement],
+    fill:false,
+    pointRadius:4
+  }];
+
+  const options = {
+    responsive:true,
+    plugins:{
+      legend:{position:'top'},
+      tooltip:{
+        callbacks:{
+          label: function(context){
+            let value = context.parsed.y;
+            const datetime = context.label;
+            if(context.dataset.label==='baro'){
+              value = value.toFixed(2) + ' inHg';
+            } else if(context.dataset.label==='light'){
+              value = value + ' %';
+            } else {
+              value = value + ' °F';
+            }
+            return `${value} at ${datetime}`;
           }
-          return `${value} at ${datetime}`;
+        }
+      }
+    },
+    scales:{
+      y:{
+        type:'linear',
+        min:minMaxMap[measurement][0],
+        max:minMaxMap[measurement][1],
+        title:{
+          display:true,
+          text: measurement==='water'||measurement==='seabed'||measurement==='air' ? 'Temperature (°F)' :
+                measurement==='baro' ? 'Barometric Pressure (inHg)' : 'Light %',
+          color: colorMap[measurement],
+          font: {size:16, weight:'bold'}
         }
       }
     }
-  },
-  scales:{
-    y:{
-      type:'linear',
-      min:minMaxMap[measurement][0],
-      max:minMaxMap[measurement][1],
-      title:{
-        display:true,
-        text:measurement==='water'||measurement==='seabed'||measurement==='air' ? 'Temperature (°F)' :
-             measurement==='baro' ? 'Barometric (inHg scaled 0-100)' : 'Light %',
-        color: colorMap[measurement],
-        font: {size:16, weight:'bold'}
-      }
-    }
-  }
-};
+  };
+
+  if(chart) chart.destroy();
+  const ctx = document.getElementById('myChart').getContext('2d');
+  chart = new Chart(ctx,{type:'line',data:{labels, datasets}, options});
+}
+
+// Dropdown events
+document.getElementById('measurementSelect').addEventListener('change', e=>{
+  const num = document.getElementById('numSelect').value;
+  drawChart(e.target.value, num);
+});
+document.getElementById('numSelect').addEventListener('change', e=>{
+  const measurement = document.getElementById('measurementSelect').value;
+  drawChart(measurement, e.target.value);
+});
+</script>
+
+</body>
+</html>
